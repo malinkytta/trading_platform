@@ -26,11 +26,19 @@ while (isRunning)
                 case "1":
                     currentMenu = Menu.Register;
                     break;
+
                 case "2":
                     currentMenu = Menu.Login;
                     break;
+
                 case "3":
                     currentMenu = Menu.Exit;
+                    break;
+
+                default:
+                    Console.WriteLine("Invalid choice. Press ENTER to try again.");
+                    Console.ReadLine();
+                    currentMenu = Menu.None;
                     break;
             }
             break;
