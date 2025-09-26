@@ -36,6 +36,16 @@ while (isRunning)
             break;
 
         case Menu.Register:
+
+            if (RegisterUser(users))
+            {
+                currentMenu = Menu.None;
+            }
+            else
+            {
+                currentMenu = Menu.Register;
+            }
+
             break;
 
         case Menu.Login:
@@ -52,5 +62,40 @@ while (isRunning)
             activeUser = null;
             currentMenu = Menu.None;
             break;
+    }
+}
+
+static bool RegisterUser(List<User> users)
+{
+    {
+        Console.Clear();
+        Console.WriteLine("----- Register new user -----");
+
+        Console.Write("Name: ");
+        string name = Console.ReadLine();
+
+        Console.Write("Email: ");
+        string email = Console.ReadLine();
+
+        Console.Write("Password: ");
+        string password = Console.ReadLine();
+
+        if (name == "" || email == "" || password == "")
+        {
+            Console.Clear();
+            Console.WriteLine("All fields are required. Please try again.");
+            Console.WriteLine("Press ENTER to continue.");
+            Console.ReadLine();
+            return false;
+        }
+
+        Console.Clear();
+        users.Add(new User(name, email, password));
+
+        Console.WriteLine("New user created successfully!");
+        Console.WriteLine("Press ENTER to return to the menu.");
+
+        Console.ReadLine();
+        return true;
     }
 }
