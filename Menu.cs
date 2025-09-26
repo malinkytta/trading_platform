@@ -3,8 +3,9 @@ namespace App;
 enum Menu
 {
     None,
-    CreateAccount,
+    Register,
     Login,
     Main,
+    Logout,
     Exit,
 }
