@@ -57,9 +57,20 @@ while (isRunning)
             break;
 
         case Menu.Login:
+
+            activeUser = LoginUser(users);
+            if (activeUser != null)
+            {
+                currentMenu = Menu.Main;
+            }
+            else
+            {
+                currentMenu = Menu.None;
+            }
             break;
 
         case Menu.Main:
+            Console.WriteLine("----- Main Menu -----");
             break;
 
         case Menu.Exit:
@@ -106,4 +117,29 @@ static bool RegisterUser(List<User> users)
         Console.ReadLine();
         return true;
     }
+}
+
+static User? LoginUser(List<User> users)
+{
+    Console.WriteLine("----- Login -----");
+
+    Console.Write("Email: ");
+    string email = Console.ReadLine();
+
+    Console.Write("Password: ");
+    string password = Console.ReadLine();
+
+    Console.Clear();
+
+    foreach (User user in users)
+    {
+        if (user.TryLogin(email, password))
+        {
+            return user;
+        }
+    }
+    Console.WriteLine("Login failed. Press ENTER to retun to the menu.");
+    Console.ReadLine();
+
+    return null;
 }
