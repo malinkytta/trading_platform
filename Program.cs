@@ -100,6 +100,7 @@ while (isRunning)
                             UploadItem(items, activeUser);
                             break;
                         case "2":
+                            ShowItems(items, activeUser);
                             break;
                     }
                     break;
@@ -206,4 +207,30 @@ static User? UploadItem(List<Item> items, User activeUser)
     Console.WriteLine($"Item '{title}' uploaded successfully!");
     Console.ReadLine();
     return activeUser;
+}
+
+static void ShowItems(List<Item> items, User? activeUser)
+{
+    Console.Clear();
+    if (items.Count == 0)
+    {
+        Console.WriteLine("There are no items uploaded yet.");
+    }
+    else
+    {
+        Console.WriteLine("All items:");
+        int i = 1;
+        foreach (Item item in items)
+        {
+            if (item.Owner != activeUser)
+            {
+                Console.WriteLine(
+                    $"{i}] Name: {item.Name}. Description: {item.Description}. Owner: {item.Owner.Name}"
+                );
+            }
+            i++;
+        }
+    }
+    Console.WriteLine("Press ENTER to return.");
+    Console.ReadLine();
 }
