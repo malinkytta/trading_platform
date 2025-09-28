@@ -1,6 +1,7 @@
 ﻿using App;
 
 List<User> users = new List<User>();
+List<Item> items = new List<Item>();
 
 bool isRunning = true;
 User? activeUser = null;
@@ -13,7 +14,8 @@ while (isRunning)
         case Menu.None:
             Console.Clear();
 
-            Console.WriteLine("----- Welcome to the Trading Platform -----");
+            Console.WriteLine("----- Welcome to the Trading Platform -----\n");
+
             Console.WriteLine("Please select an option: ");
             Console.WriteLine("1] Register new account");
             Console.WriteLine("2] Login");
@@ -70,7 +72,51 @@ while (isRunning)
             break;
 
         case Menu.Main:
+
+            Console.Clear();
             Console.WriteLine("----- Main Menu -----");
+            Console.WriteLine($"Logged in as: {activeUser?.Name}\n");
+            Console.WriteLine("Please select an option: ");
+
+            Console.WriteLine("1] Items");
+            Console.WriteLine("2] Trades");
+            Console.WriteLine("3] Log out");
+            Console.WriteLine("4] Exit");
+
+            input = Console.ReadLine();
+
+            switch (input)
+            {
+                case "1":
+                    Console.Clear();
+                    Console.WriteLine("----- Items -----");
+                    Console.WriteLine("1] Upload a new item");
+                    Console.WriteLine("2] Browse items");
+
+                    input = Console.ReadLine();
+                    switch (input)
+                    {
+                        case "1":
+                            UploadItem(items, activeUser);
+                            break;
+                        case "2":
+                            break;
+                    }
+                    break;
+                case "2":
+                    break;
+                case "3":
+                    currentMenu = Menu.Logout;
+                    break;
+                case "4":
+                    currentMenu = Menu.Exit;
+                    break;
+                default:
+                    Console.WriteLine("Invalid choice. Press ENTER to try again.");
+                    Console.ReadLine();
+                    break;
+            }
+
             break;
 
         case Menu.Exit:
@@ -121,6 +167,7 @@ static bool RegisterUser(List<User> users)
 
 static User? LoginUser(List<User> users)
 {
+    Console.Clear();
     Console.WriteLine("----- Login -----");
 
     Console.Write("Email: ");
@@ -142,4 +189,21 @@ static User? LoginUser(List<User> users)
     Console.ReadLine();
 
     return null;
+}
+
+static User? UploadItem(List<Item> items, User activeUser)
+{
+    Console.Clear();
+
+    Console.Write("Title: ");
+    string title = Console.ReadLine();
+
+    Console.Write("Description: ");
+    string desc = Console.ReadLine();
+
+    items.Add(new Item(title, desc, activeUser));
+
+    Console.WriteLine($"Item '{title}' uploaded successfully!");
+    Console.ReadLine();
+    return activeUser;
 }
