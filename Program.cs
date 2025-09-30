@@ -3,6 +3,18 @@
 List<User> users = new List<User>();
 List<Item> items = new List<Item>();
 
+string userPath = "users.csv";
+
+if (File.Exists(userPath))
+{
+    string[] users_scv = File.ReadAllLines(userPath);
+    foreach (string user in users_scv)
+    {
+        string[] split_userdata = user.Split(",");
+        users.Add(new User(split_userdata[0], split_userdata[1], split_userdata[2]));
+    }
+}
+
 bool isRunning = true;
 User? activeUser = null;
 Menu currentMenu = Menu.None;
@@ -47,7 +59,10 @@ while (isRunning)
 
         case Menu.Register:
 
-            if (RegisterUser(users))
+            // RegisterUser(users) returnerar en bool (sant/falskt värde)
+            // true = lyckad registrering, tillbaka till startmeny.
+            // false = misslyckad registering, stanna kvar i samma meny så man kan försöka igen.
+            if (RegisterUser(users, userPath))
             {
                 currentMenu = Menu.None;
             }
@@ -60,6 +75,8 @@ while (isRunning)
 
         case Menu.Login:
 
+            //LoginUser(users) returnerar en User om lyckad inloggning, annars null.
+            // Om vi får en User, spara som activeUser och gå till huvudmenyn, annars till startsidan.
             activeUser = LoginUser(users);
             if (activeUser != null)
             {
@@ -97,21 +114,31 @@ while (isRunning)
                     switch (input)
                     {
                         case "1":
+                            // Skapar ett nytt item kopplat till den inloggade användaren
                             UploadItem(items, activeUser);
                             break;
                         case "2":
+                            // Visar alla andras items
                             ShowItems(items, activeUser);
+                            break;
+                        default:
+                            Console.WriteLine("Invalid choice. Press ENTER to try again.");
+                            Console.ReadLine();
                             break;
                     }
                     break;
+
                 case "2":
                     break;
+
                 case "3":
                     currentMenu = Menu.Logout;
                     break;
+
                 case "4":
                     currentMenu = Menu.Exit;
                     break;
+
                 default:
                     Console.WriteLine("Invalid choice. Press ENTER to try again.");
                     Console.ReadLine();
@@ -131,7 +158,9 @@ while (isRunning)
     }
 }
 
-static bool RegisterUser(List<User> users)
+// Försöker registrera ny användare.
+// Returnerar true om registreringen lyckades, annars false.
+static bool RegisterUser(List<User> users, string userPath)
 {
     {
         Console.Clear();
@@ -156,6 +185,9 @@ static bool RegisterUser(List<User> users)
         }
 
         Console.Clear();
+
+        string[] newUser = { $"{name},{email},{password}" }; // skapar en array av strängar
+        File.AppendAllLines(userPath, newUser); // lägger till den nya användaren i listan
         users.Add(new User(name, email, password));
 
         Console.WriteLine("New user created successfully!");
@@ -166,6 +198,8 @@ static bool RegisterUser(List<User> users)
     }
 }
 
+// Försöker logga in användare med e-post och lösenord.
+// Returnerar User om inloggning lyckats, annars null.
 static User? LoginUser(List<User> users)
 {
     Console.Clear();
@@ -186,13 +220,14 @@ static User? LoginUser(List<User> users)
             return user;
         }
     }
-    Console.WriteLine("Login failed. Press ENTER to retun to the menu.");
+    Console.WriteLine("Login failed. Press ENTER to return to the menu.");
     Console.ReadLine();
 
     return null;
 }
 
-static User? UploadItem(List<Item> items, User activeUser)
+// Låter den inloggade användaren ladda upp ett nytt item.
+static void UploadItem(List<Item> items, User activeUser)
 {
     Console.Clear();
 
@@ -202,17 +237,17 @@ static User? UploadItem(List<Item> items, User activeUser)
     Console.Write("Description: ");
     string desc = Console.ReadLine();
 
-    items.Add(new Item(title, desc, activeUser));
+    items.Add(new Item(title, desc, activeUser)); //Kopplar den inloggade användaren till item
 
     Console.WriteLine($"Item '{title}' uploaded successfully!");
     Console.ReadLine();
-    return activeUser;
 }
 
+// Visar alla items som inte tillhör den inloggade användaren.
 static void ShowItems(List<Item> items, User? activeUser)
 {
     Console.Clear();
-    if (items.Count == 0)
+    if (items.Count == 0) //om det inte finns några items så kommer den in här
     {
         Console.WriteLine("There are no items uploaded yet.");
     }
@@ -222,7 +257,7 @@ static void ShowItems(List<Item> items, User? activeUser)
         int i = 1;
         foreach (Item item in items)
         {
-            if (item.Owner != activeUser)
+            if (item.Owner != activeUser) // visa inte items som ägs av den inloggade användaren
             {
                 Console.WriteLine(
                     $"{i}] Name: {item.Name}. Description: {item.Description}. Owner: {item.Owner.Name}"
