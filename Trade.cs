@@ -2,16 +2,16 @@ namespace App;
 
 public class Trade
 {
-    public List<Item> Items;
+    public Item TradedItem;
     public User Sender;
     public User Receiver;
     public TradeStatus Status;
 
-    public Trade(List<Item> items, User sender, User reciever, TradeStatus status)
+    public Trade(Item item, User sender, User receiver, TradeStatus status)
     {
-        Items = items;
+        TradedItem = item;
         Sender = sender;
-        Receiver = reciever;
+        Receiver = receiver;
         Status = status;
     }
 }
