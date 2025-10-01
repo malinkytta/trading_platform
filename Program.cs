@@ -1,23 +1,56 @@
 ﻿using App;
 
+string usersFilePath = "users.csv";
+string itemsFilePath = "items.csv";
+
 List<User> users = new List<User>();
 List<Item> items = new List<Item>();
-
-string userPath = "users.csv";
-
-if (File.Exists(userPath))
-{
-    string[] users_scv = File.ReadAllLines(userPath);
-    foreach (string user in users_scv)
-    {
-        string[] split_userdata = user.Split(",");
-        users.Add(new User(split_userdata[0], split_userdata[1], split_userdata[2]));
-    }
-}
 
 bool isRunning = true;
 User? activeUser = null;
 Menu currentMenu = Menu.None;
+
+//Kolla om user-filen finns, annars hoppa över
+if (File.Exists(usersFilePath))
+{
+    // Läs in alla rader från users.csv och spara i userLines (en array av strängar)
+    string[] userLines = File.ReadAllLines(usersFilePath);
+
+    foreach (string userLine in userLines)
+    {
+        // Dela upp raden efter kommatecken
+        string[] fields = userLine.Split(",");
+
+        // Skapa en User och lägg till i listan
+        users.Add(new User(fields[0], fields[1], fields[2]));
+    }
+}
+
+// Kolla om item-filen finns, annars hoppa över
+if (File.Exists(itemsFilePath))
+{
+    // Läs in alla rader från items.csv och spara i itemLines (array av strängar)
+    string[] itemLines = File.ReadAllLines(itemsFilePath);
+
+    foreach (string itemLine in itemLines)
+    {
+        // Dela upp raden efter kommatecken
+        string[] fields = itemLine.Split(",");
+
+        string ownerName = fields[2];
+
+        // Hitta rätt User som matchar ownerName
+        foreach (User user in users)
+        {
+            if (user.Name == ownerName)
+            {
+                // Skapa ett Item och koppla ihop med användaren
+                items.Add(new Item(fields[0], fields[1], user));
+                break; //sluta leta, vi hittade rätt
+            }
+        }
+    }
+}
 
 while (isRunning)
 {
@@ -62,7 +95,7 @@ while (isRunning)
             // RegisterUser(users) returnerar en bool (sant/falskt värde)
             // true = lyckad registrering, tillbaka till startmeny.
             // false = misslyckad registering, stanna kvar i samma meny så man kan försöka igen.
-            if (RegisterUser(users, userPath))
+            if (RegisterUser(users, usersFilePath))
             {
                 currentMenu = Menu.None;
             }
@@ -115,11 +148,13 @@ while (isRunning)
                     {
                         case "1":
                             // Skapar ett nytt item kopplat till den inloggade användaren
-                            UploadItem(items, activeUser);
+                            UploadItem(items, activeUser, itemsFilePath);
                             break;
                         case "2":
                             // Visar alla andras items
+
                             ShowItems(items, activeUser);
+
                             break;
                         default:
                             Console.WriteLine("Invalid choice. Press ENTER to try again.");
@@ -160,7 +195,7 @@ while (isRunning)
 
 // Försöker registrera ny användare.
 // Returnerar true om registreringen lyckades, annars false.
-static bool RegisterUser(List<User> users, string userPath)
+static bool RegisterUser(List<User> users, string usersFilePath)
 {
     {
         Console.Clear();
@@ -185,9 +220,10 @@ static bool RegisterUser(List<User> users, string userPath)
         }
 
         Console.Clear();
-
         string[] newUser = { $"{name},{email},{password}" }; // skapar en array av strängar
-        File.AppendAllLines(userPath, newUser); // lägger till den nya användaren i listan
+
+        File.AppendAllLines(usersFilePath, newUser); // lägger till den nya användaren i listan
+
         users.Add(new User(name, email, password));
 
         Console.WriteLine("New user created successfully!");
@@ -227,7 +263,7 @@ static User? LoginUser(List<User> users)
 }
 
 // Låter den inloggade användaren ladda upp ett nytt item.
-static void UploadItem(List<Item> items, User activeUser)
+static void UploadItem(List<Item> items, User activeUser, string itemsFilePath)
 {
     Console.Clear();
 
@@ -238,6 +274,10 @@ static void UploadItem(List<Item> items, User activeUser)
     string desc = Console.ReadLine();
 
     items.Add(new Item(title, desc, activeUser)); //Kopplar den inloggade användaren till item
+    string owner = activeUser.Name;
+
+    string[] newItem = { $"{title},{desc},{owner}" };
+    File.AppendAllLines(itemsFilePath, newItem);
 
     Console.WriteLine($"Item '{title}' uploaded successfully!");
     Console.ReadLine();
@@ -247,23 +287,36 @@ static void UploadItem(List<Item> items, User activeUser)
 static void ShowItems(List<Item> items, User? activeUser)
 {
     Console.Clear();
-    if (items.Count == 0) //om det inte finns några items så kommer den in här
+
+    if (items.Count == 0)
     {
         Console.WriteLine("There are no items uploaded yet.");
+        Console.WriteLine("Press ENTER to return.");
+        Console.ReadLine();
+        return;
     }
     else
     {
-        Console.WriteLine("All items:");
-        int i = 1;
+        // Används både som räknare för att skriva ut listan snyggt men även för att hålla koll på vems items som syns
+        int i = 0;
         foreach (Item item in items)
         {
-            if (item.Owner != activeUser) // visa inte items som ägs av den inloggade användaren
+            // visa bara andras grejer
+            if (item.Owner.Name != activeUser.Name)
             {
                 Console.WriteLine(
-                    $"{i}] Name: {item.Name}. Description: {item.Description}. Owner: {item.Owner.Name}"
+                    $"{i + 1}] Name: {item.Name}. Description: {item.Description}. Owner: {item.Owner.Name}"
                 );
+                // +1 så utskriften börjar på 1, inte 0
+
+                i++;
             }
-            i++;
+        }
+
+        // Om i inte ökas, så är det ens egna items som finns i listan och man hamnar här
+        if (i == 0)
+        {
+            Console.WriteLine("No items yet");
         }
     }
     Console.WriteLine("Press ENTER to return.");
