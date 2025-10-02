@@ -264,6 +264,7 @@ while (isRunning)
                             break;
 
                         case "3":
+                            PrintCompleted(trades, activeUser);
                             break;
 
                         case "4":
@@ -747,5 +748,43 @@ static void PrintApproved(List<Trade> trades, User activeUser)
         Console.WriteLine("No approved trades.");
     }
     Console.WriteLine("Press ENTER to continue");
+    Console.ReadLine();
+}
+
+// Skriver ut alla trades som är klara (ej Pending eller None) för en användare.
+static void PrintCompleted(List<Trade> trades, User activeUser)
+{
+    Console.Clear();
+    Console.WriteLine("----- Completed requests -----\n");
+
+    int i = 1;
+    bool found = false;
+
+    foreach (Trade trade in trades)
+    {
+        // visa bara completed trades där den inloggade är sender eller receiver
+        if (
+            (trade.Sender == activeUser || trade.Receiver == activeUser)
+            && trade.Status != TradeStatus.Pending
+            && trade.Status != TradeStatus.None
+        )
+        {
+            found = true;
+            Console.WriteLine(
+                $"{i}] From: {trade.Sender.Name} -> {trade.Receiver.Name} | Status: {trade.Status}"
+            );
+            foreach (Item item in trade.Items)
+            {
+                Console.WriteLine($"    - {item.Name} (Owner: {item.Owner.Name})");
+            }
+            i++;
+        }
+    }
+    if (!found)
+    {
+        Console.WriteLine("No completed requests.");
+    }
+
+    Console.WriteLine("\nPress ENTER to return");
     Console.ReadLine();
 }
