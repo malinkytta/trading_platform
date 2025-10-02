@@ -260,6 +260,7 @@ while (isRunning)
                             break;
 
                         case "2":
+                            PrintApproved(trades, activeUser);
                             break;
 
                         case "3":
@@ -382,10 +383,7 @@ static void UploadItem(List<Item> items, User activeUser, string itemsFilePath)
     string desc = Console.ReadLine();
 
     items.Add(new Item(title, desc, activeUser)); //Kopplar den inloggade användaren till item
-    string owner = activeUser.Name;
-
-    string[] newItem = { $"{title},{desc},{owner}" };
-    File.AppendAllLines(itemsFilePath, newItem);
+    SaveItemsToFile(items, itemsFilePath);
 
     Console.WriteLine($"Item '{title}' uploaded successfully!");
     Console.ReadLine();
@@ -704,7 +702,7 @@ static List<Trade> PrintPending(List<Trade> trades, User activeUser)
 }
 
 // Sparar hela listan av items till fil.
-void SaveItemsToFile(List<Item> items, string itemsFilePath)
+static void SaveItemsToFile(List<Item> items, string itemsFilePath)
 {
     List<string> itemLines = new List<string>();
     foreach (Item item in items)
@@ -713,4 +711,41 @@ void SaveItemsToFile(List<Item> items, string itemsFilePath)
         itemLines.Add(itemLine);
     }
     File.WriteAllLines(itemsFilePath, itemLines);
+}
+
+// Skriver ut alla trades som är Approved för en användare.
+static void PrintApproved(List<Trade> trades, User activeUser)
+{
+    Console.Clear();
+    Console.WriteLine("----- Completed (Approved) trades -----\n");
+
+    int i = 1;
+    bool found = false;
+
+    foreach (Trade trade in trades)
+    {
+        if (
+            trade.Status == TradeStatus.Approved
+            && (trade.Sender == activeUser || trade.Receiver == activeUser)
+        )
+        {
+            found = true;
+
+            Console.WriteLine($"{i}] From: {trade.Sender.Name} | Status: {trade.Status}");
+
+            foreach (Item it in trade.Items)
+            {
+                Console.WriteLine($"    - {it.Name} (Owner: {it.Owner.Name})");
+            }
+
+            i++;
+        }
+    }
+
+    if (!found)
+    {
+        Console.WriteLine("No approved trades.");
+    }
+    Console.WriteLine("Press ENTER to continue");
+    Console.ReadLine();
 }
