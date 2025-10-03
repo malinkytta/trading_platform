@@ -65,7 +65,7 @@ if (File.Exists(tradesFilePath))
         string senderName = fields[0];
         string receiverName = fields[1];
         string itemsList = fields[2];
-        string statusText = fields[3];
+        string statusText = fields[fields.Length - 1];
 
         User sender = null;
         User receiver = null;
@@ -90,7 +90,7 @@ if (File.Exists(tradesFilePath))
 
         List<Item> tradedItems = new List<Item>();
 
-        string[] itemNames = itemsList.Split("|");
+        string[] itemNames = itemsList.Split(",");
 
         foreach (string itemName in itemNames)
         {
@@ -99,11 +99,13 @@ if (File.Exists(tradesFilePath))
                 if (item.Name == itemName)
                 {
                     tradedItems.Add(item);
+                    break;
                 }
             }
         }
 
         TradeStatus currentStatus = TradeStatus.None;
+
         switch (statusText)
         {
             case "Pending":
@@ -111,15 +113,18 @@ if (File.Exists(tradesFilePath))
                 break;
 
             case "Approved":
-            {
+
                 currentStatus = TradeStatus.Approved;
                 break;
-            }
+
             case "Denied":
-            {
+
                 currentStatus = TradeStatus.Denied;
                 break;
-            }
+
+            default:
+                currentStatus = TradeStatus.None;
+                break;
         }
         // lägg till trade om allt finns
         if (sender != null && receiver != null && tradedItems.Count > 0)
@@ -248,7 +253,7 @@ while (isRunning)
                     Console.WriteLine("----- Trades -----\n");
                     Console.WriteLine("1] Pending (incoming)");
                     Console.WriteLine("2] Approved");
-                    Console.WriteLine("3] Completed");
+                    Console.WriteLine("3] Completed (approved & denied)");
                     Console.WriteLine("4] Back to Main Menu");
 
                     string choice = Console.ReadLine();
@@ -307,41 +312,39 @@ while (isRunning)
 // Returnerar true om registreringen lyckades, annars false.
 static bool RegisterUser(List<User> users, string usersFilePath)
 {
+    Console.Clear();
+    Console.WriteLine("----- Register new user -----");
+
+    Console.Write("Name: ");
+    string name = Console.ReadLine();
+
+    Console.Write("Email: ");
+    string email = Console.ReadLine();
+
+    Console.Write("Password: ");
+    string password = Console.ReadLine();
+
+    if (name == "" || email == "" || password == "")
     {
         Console.Clear();
-        Console.WriteLine("----- Register new user -----");
-
-        Console.Write("Name: ");
-        string name = Console.ReadLine();
-
-        Console.Write("Email: ");
-        string email = Console.ReadLine();
-
-        Console.Write("Password: ");
-        string password = Console.ReadLine();
-
-        if (name == "" || email == "" || password == "")
-        {
-            Console.Clear();
-            Console.WriteLine("All fields are required. Please try again.");
-            Console.WriteLine("Press ENTER to continue.");
-            Console.ReadLine();
-            return false;
-        }
-
-        Console.Clear();
-        string[] newUser = { $"{name},{email},{password}" }; // skapar en array av strängar
-
-        File.AppendAllLines(usersFilePath, newUser); // lägger till den nya användaren i listan
-
-        users.Add(new User(name, email, password));
-
-        Console.WriteLine("New user created successfully!");
-        Console.WriteLine("Press ENTER to return to the menu.");
-
+        Console.WriteLine("All fields are required. Please try again.");
+        Console.WriteLine("Press ENTER to continue.");
         Console.ReadLine();
-        return true;
+        return false;
     }
+
+    Console.Clear();
+    string[] newUser = { $"{name},{email},{password}" }; // skapar en array av strängar
+
+    File.AppendAllLines(usersFilePath, newUser); // lägger till den nya användaren i listan
+
+    users.Add(new User(name, email, password));
+
+    Console.WriteLine("New user created successfully!");
+    Console.WriteLine("Press ENTER to return to the menu.");
+
+    Console.ReadLine();
+    return true;
 }
 
 // Försöker logga in användare med e-post och lösenord.
@@ -391,81 +394,125 @@ static void UploadItem(List<Item> items, User activeUser, string itemsFilePath)
 }
 
 // Visar alla items som inte tillhör den inloggade användaren.
-void ShowItems(List<Item> items, User activeUser, List<Trade> trades, string tradesFilePath)
+static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, string tradesFilePath)
 {
     Console.Clear();
 
-    // Lista för andras items
-    List<Item> availableItems = new List<Item>();
-    int i = 1;
+    // Lista för andras items som inte har status 'pending'
+    List<Item> othersItems = new List<Item>();
 
     foreach (Item item in items)
     {
-        if (item.Owner.Name != activeUser.Name)
+        if (item.Owner != activeUser)
         {
-            bool hasPending = false;
-
-            // kolla om item redan ligger i en pending trade
-            foreach (Trade trade in trades)
-            {
-                if (trade.Status == TradeStatus.Pending)
-                {
-                    foreach (Item traded in trade.Items)
-                    {
-                        if (traded == item)
-                        {
-                            hasPending = true;
-                            break;
-                        }
-                    }
-                    if (hasPending)
-                        break;
-                }
-            }
-
-            if (!hasPending)
-            {
-                Console.WriteLine(
-                    $"{i}] Name: {item.Name}. Description: {item.Description}. Owner: {item.Owner.Name}"
-                );
-                availableItems.Add(item);
-                i++;
-            }
+            othersItems.Add(item);
         }
     }
+    List<Item> availableItems = GetAvailableItems(othersItems, trades);
 
     if (availableItems.Count == 0)
     {
-        Console.WriteLine("No items from other users yet.");
+        Console.WriteLine("No available items yet.");
         Console.WriteLine("Press ENTER to return.");
         Console.ReadLine();
         return;
     }
 
-    Console.WriteLine("\nEnter number to request a trade, or press ENTER to go back:");
+    List<Item> selected = new List<Item>();
+    User? selectedOwner = null;
+    string header = "----- Pick items to request -----";
+    while (true)
+    {
+        List<Item> remaining = GetRemainingItems(availableItems, selected);
+        if (remaining.Count == 0)
+        {
+            break;
+        }
+        Item? pick = SelectItemPrompt(remaining, selected, header);
+
+        if (pick == null)
+        {
+            break;
+        }
+        if (selectedOwner == null)
+        {
+            selectedOwner = pick.Owner;
+            availableItems = FilterByOwner(availableItems, selectedOwner);
+
+            header = "----- Pick items to request (only " + selectedOwner.Name + ") -----";
+        }
+        selected.Add(pick);
+    }
+    if (selected.Count > 0)
+    {
+        CreateTrade(trades, activeUser, selected, tradesFilePath, items);
+    }
+}
+
+// Returnerar en lista med items från 'availableItems'
+// som ännu inte har blivit valda i 'selectedItems'
+static List<Item> GetRemainingItems(List<Item> availableItems, List<Item> selectedItems)
+{
+    List<Item> remainingItems = new List<Item>();
+    foreach (Item item in availableItems)
+    {
+        bool isSelected = false;
+        foreach (Item selected in selectedItems)
+        {
+            if (selected == item)
+            {
+                isSelected = true;
+                break;
+            }
+        }
+        if (!isSelected)
+        {
+            remainingItems.Add(item);
+        }
+    }
+    return remainingItems;
+}
+
+// Låter användaren välja ett item från en lsita, eller trycka ENTER för att avbryta
+// Returnerar det valda itemet, eller null om användaren avbryter
+static Item? SelectItemPrompt(List<Item> availableItems, List<Item> selectedItems, string menuTitle)
+{
+    Console.Clear();
+    Console.WriteLine($"{menuTitle}\n");
+
+    if (selectedItems.Count > 0)
+    {
+        Console.WriteLine("Selected so far: ");
+        foreach (Item selectedItem in selectedItems)
+        {
+            Console.WriteLine(" - " + selectedItem.Name);
+        }
+    }
+    Console.WriteLine("Available:");
+    int i = 1;
+    foreach (Item item in availableItems)
+    {
+        Console.WriteLine($"{i}] {item.Name} - {item.Description} (Owner: {item.Owner.Name})");
+        i++;
+    }
+
+    Console.WriteLine("\nEnter number to add, or press ENTER to finish:");
+
     string input = Console.ReadLine();
 
     if (input == "")
     {
-        return;
+        return null;
     }
 
-    if (!int.TryParse(input, out int inputChoice))
+    if (int.TryParse(input, out int choice) && choice >= 1 && choice <= availableItems.Count)
     {
-        Console.WriteLine("Invalid choice. Press ENTER to return.");
-        Console.ReadLine();
-        return;
+        return availableItems[choice - 1]; // returnerar det valda itemet
     }
 
-    if (inputChoice < 1 || inputChoice > availableItems.Count)
-    {
-        Console.WriteLine("Invalid choice. Press ENTER to return.");
-        Console.ReadLine();
-        return;
-    }
-
-    Item wantedItem = availableItems[inputChoice - 1];
-    CreateTrade(trades, activeUser, wantedItem, tradesFilePath, activeUser, items);
+    Console.WriteLine("Invalid choice. Press ENTER to continue.");
+    Console.ReadLine();
+    return null;
 }
 
 // Skapar en ny trade mellan sender och itemets ägare.
@@ -473,38 +520,55 @@ void ShowItems(List<Item> items, User activeUser, List<Trade> trades, string tra
 static void CreateTrade(
     List<Trade> trades,
     User sender,
-    Item wantedItem,
+    List<Item> wantedItems,
     string tradesFilePath,
-    User activeUser,
     List<Item> items
 )
 {
     Console.Clear();
 
-    // Ägaren till det valda (andras) itemet
-    User receiver = wantedItem.Owner;
-
+    // Ägaren till det valda (den andras) item
+    User receiver = wantedItems[0].Owner;
     List<Item> payload = new List<Item>();
-    Item? offeredItem = PickOneOfOwnItems(items, activeUser);
-    if (offeredItem == null)
+
+    // Kolla ägare + lägg till items i payload
+    foreach (Item wantedItem in wantedItems)
     {
-        Console.WriteLine("Cancelled.");
-        Console.ReadLine();
-        return;
+        payload.Add(wantedItem);
     }
 
-    payload.Add(wantedItem);
-    payload.Add(offeredItem);
+    List<Item> offeredItems = PickOwnItems(items, sender, trades);
 
+    foreach (Item offeredItem in offeredItems)
+    {
+        payload.Add(offeredItem);
+    }
+
+    //Skapa och spara traden
     Trade newTrade = new Trade(payload, sender, receiver, TradeStatus.Pending);
-
     trades.Add(newTrade);
-
     SaveTradesToFile(trades, tradesFilePath);
 
+    Console.Clear();
     Console.WriteLine($"Trade request sent to: {receiver.Name}");
-    Console.WriteLine($"You want: {wantedItem.Name}");
-    Console.WriteLine($"You offered: {offeredItem.Name}");
+    Console.WriteLine($"You want: ");
+    foreach (Item wantedItem in wantedItems)
+    {
+        Console.WriteLine(wantedItem.Name);
+    }
+
+    Console.WriteLine($"You offered: ");
+    if (offeredItems.Count == 0)
+    {
+        Console.WriteLine("nothing");
+    }
+    else
+    {
+        foreach (Item offeredItem in offeredItems)
+        {
+            Console.WriteLine(" - " + offeredItem.Name);
+        }
+    }
 
     Console.WriteLine("Press ENTER to continue");
     Console.ReadLine();
@@ -514,72 +578,73 @@ static void CreateTrade(
 static void SaveTradesToFile(List<Trade> trades, string tradesFilePath)
 {
     List<string> tradeLines = new List<string>();
+
     foreach (Trade trade in trades)
     {
         string itemLines = "";
         foreach (Item item in trade.Items)
         {
-            if (itemLines != "")
-            {
-                itemLines += "|";
-            }
-
-            itemLines += item.Name;
+            itemLines += item.Name + ",";
         }
-        string tradeLine = $"{trade.Sender.Name},{trade.Receiver.Name},{itemLines},{trade.Status}";
+        string tradeLine = $"{trade.Sender.Name},{trade.Receiver.Name},{itemLines}{trade.Status}";
 
         tradeLines.Add(tradeLine);
     }
     File.WriteAllLines(tradesFilePath, tradeLines);
 }
 
-static Item? PickOneOfOwnItems(List<Item> items, User activeUser)
+// Låter användaren välja sina egna items att erbjuda i en trade
+// Returnerar en lista med valda items, eller en tom lista om inga väljs
+static List<Item> PickOwnItems(List<Item> items, User activeUser, List<Trade> trades)
 {
-    Console.Clear();
-    Console.WriteLine("----- Pick one of your items to offer -----\n");
+    // Hämta bara mina egna items
+    List<Item> myItems = FilterByOwner(items, activeUser);
 
-    List<Item> mine = new List<Item>();
-    int i = 1;
+    // Filtrera bort de som redan är med i pending-trades
+    myItems = GetAvailableItems(myItems, trades);
 
-    foreach (Item it in items)
+    if (myItems.Count == 0)
     {
-        if (it.Owner.Name == activeUser.Name)
+        Console.WriteLine(
+            "\nYou don't have any items to offer. Press ENTER to continue without offering."
+        );
+        Console.ReadLine();
+
+        return new List<Item>();
+    }
+
+    // Lista över vad jag väljer
+    List<Item> selectedItems = new List<Item>();
+
+    while (true)
+    {
+        List<Item> remainingItems = GetRemainingItems(myItems, selectedItems);
+        if (remainingItems.Count == 0)
         {
-            Console.WriteLine($"{i}] {it.Name} - {it.Description}");
-            mine.Add(it);
-            i++;
+            break;
         }
+
+        // Visa meny för att välja ett item
+        Item? pick = SelectItemPrompt(
+            remainingItems,
+            selectedItems,
+            "----- Pick your items to offer -----"
+        );
+
+        if (pick == null)
+        {
+            break;
+        }
+
+        selectedItems.Add(pick);
     }
 
-    if (mine.Count == 0)
-    {
-        Console.WriteLine("\nYou don't have any items to offer. Press ENTER to cancel.");
-        Console.ReadLine();
-        return null;
-    }
-
-    Console.WriteLine("\nEnter number (or press ENTER to cancel):");
-
-    string input = Console.ReadLine();
-
-    if (input == "")
-    {
-        return null;
-    }
-
-    if (!int.TryParse(input, out int choice) || choice < 1 || choice > mine.Count)
-    {
-        Console.WriteLine("Invalid choice. Press ENTER to cancel.");
-        Console.ReadLine();
-        return null;
-    }
-
-    return mine[choice - 1];
+    return selectedItems;
 }
 
 // Låter en användare hantera sina Pending trades.
 // Kan välja att godkänna, neka eller gå tillbaka.
-void HandlePending(
+static void HandlePending(
     List<Trade> trades,
     User activeUser,
     string tradesFilePath,
@@ -599,6 +664,7 @@ void HandlePending(
         Console.ReadLine();
         return;
     }
+
     Console.WriteLine("\nEnter number to manage a request, or press ENTER to go back:");
 
     string input = Console.ReadLine();
@@ -646,6 +712,7 @@ void HandlePending(
 
     if (action == "A")
     {
+        Console.Clear();
         foreach (Item item in selected.Items)
         {
             if (item.Owner == selected.Sender)
@@ -662,6 +729,7 @@ void HandlePending(
     }
     else if (action == "D")
     {
+        Console.Clear();
         selected.Status = TradeStatus.Denied;
         SaveTradesToFile(trades, tradesFilePath);
         Console.WriteLine("Request denied.");
@@ -679,6 +747,7 @@ void HandlePending(
 // Returnerar listan med dessa trades.
 static List<Trade> PrintPending(List<Trade> trades, User activeUser)
 {
+    Console.Clear();
     Console.WriteLine("----- Pending trade requests -----\n");
 
     List<Trade> pendingList = new List<Trade>();
@@ -700,6 +769,18 @@ static List<Trade> PrintPending(List<Trade> trades, User activeUser)
         }
     }
     return pendingList;
+}
+
+//Filtrerar en lista av items och returnerar endast de som ägs av en viss användare
+static List<Item> FilterByOwner(List<Item> source, User owner)
+{
+    List<Item> result = new List<Item>();
+    foreach (Item item in source)
+    {
+        if (item.Owner == owner)
+            result.Add(item);
+    }
+    return result;
 }
 
 // Sparar hela listan av items till fil.
@@ -755,7 +836,7 @@ static void PrintApproved(List<Trade> trades, User activeUser)
 static void PrintCompleted(List<Trade> trades, User activeUser)
 {
     Console.Clear();
-    Console.WriteLine("----- Completed requests -----\n");
+    Console.WriteLine("----- Completed (Approved or Denied) -----\n");
 
     int i = 1;
     bool found = false;
@@ -771,8 +852,9 @@ static void PrintCompleted(List<Trade> trades, User activeUser)
         {
             found = true;
             Console.WriteLine(
-                $"{i}] From: {trade.Sender.Name} -> {trade.Receiver.Name} | Status: {trade.Status}"
+                $"\n{i}] From: {trade.Sender.Name} to: {trade.Receiver.Name} | Status: {trade.Status}"
             );
+            Console.WriteLine("Items:");
             foreach (Item item in trade.Items)
             {
                 Console.WriteLine($"    - {item.Name} (Owner: {item.Owner.Name})");
@@ -787,4 +869,38 @@ static void PrintCompleted(List<Trade> trades, User activeUser)
 
     Console.WriteLine("\nPress ENTER to return");
     Console.ReadLine();
+}
+
+// Returnerar alla items som inte är med i någon pågående (Pending) trade
+static List<Item> GetAvailableItems(List<Item> allItems, List<Trade> trades)
+{
+    List<Item> availableItems = new List<Item>();
+
+    foreach (Item item in allItems)
+    {
+        bool isPending = false;
+
+        // Kolla om item redan finns med i en pending trade
+        foreach (Trade trade in trades)
+        {
+            if (trade.Status == TradeStatus.Pending)
+            {
+                foreach (Item traded in trade.Items)
+                {
+                    if (traded == item)
+                    {
+                        isPending = true;
+                        break;
+                    }
+                }
+            }
+            if (isPending)
+                break;
+        }
+        if (!isPending)
+        {
+            availableItems.Add(item);
+        }
+    }
+    return availableItems;
 }
