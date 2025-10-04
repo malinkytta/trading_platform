@@ -454,22 +454,15 @@ static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, str
 static List<Item> GetRemainingItems(List<Item> availableItems, List<Item> selectedItems)
 {
     List<Item> remainingItems = new List<Item>();
+
     foreach (Item item in availableItems)
     {
-        bool isSelected = false;
-        foreach (Item selected in selectedItems)
-        {
-            if (selected == item)
-            {
-                isSelected = true;
-                break;
-            }
-        }
-        if (!isSelected)
+        if (!selectedItems.Contains(item))
         {
             remainingItems.Add(item);
         }
     }
+
     return remainingItems;
 }
 
