@@ -62,9 +62,13 @@ if (File.Exists(tradesFilePath))
     {
         string[] fields = tradeLine.Split(",");
 
+        if (fields.Length < 5)
+        {
+            break;
+        }
+
         string senderName = fields[0];
         string receiverName = fields[1];
-        string itemsList = fields[2];
         string statusText = fields[fields.Length - 1];
 
         User sender = null;
@@ -90,15 +94,30 @@ if (File.Exists(tradesFilePath))
 
         List<Item> tradedItems = new List<Item>();
 
-        string[] itemNames = itemsList.Split(",");
-
-        foreach (string itemName in itemNames)
+        // plocka alla items mellan index 2 och stanna innan sista eftersom det är status, i += 2 eftersom det är ett par (item&owner)
+        for (int i = 2; i < fields.Length - 1; i += 2)
         {
-            foreach (Item item in items)
+            string itemName = fields[i]; //första fältet är item name
+            string ownerName = fields[i + 1]; // plus 1 eftersom nästa är ägare
+
+            User owner = null;
+            foreach (User user in users)
             {
-                if (item.Name == itemName)
+                if (user.Name == ownerName)
                 {
-                    tradedItems.Add(item);
+                    owner = user;
+                    break;
+                }
+            }
+            if (owner == null)
+            {
+                break;
+            }
+            for (int j = 0; i < items.Count; j++)
+            {
+                if (items[j].Name == itemName && items[j].Owner == owner)
+                {
+                    tradedItems.Add(items[j]);
                     break;
                 }
             }
@@ -412,6 +431,21 @@ static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, str
     //Filtrera bort items som är med i pending-trades
     List<Item> availableItems = GetAvailableItems(othersItems, trades);
 
+    for (int tries = 0; tries < availableItems.Count; tries++)
+    {
+        for (int i = 1; i < availableItems.Count; i++)
+        {
+            Item current = availableItems[i];
+            Item previous = availableItems[i - 1];
+
+            if (string.Compare(current.Owner.Name, previous.Owner.Name) < 0)
+            {
+                availableItems[i] = previous;
+                availableItems[i - 1] = current;
+            }
+        }
+    }
+
     if (availableItems.Count == 0)
     {
         Console.WriteLine("No available items yet.");
@@ -531,13 +565,13 @@ static void CreateTrade(
     Console.WriteLine($"You want: ");
     foreach (Item wantedItem in wantedItems)
     {
-        Console.WriteLine(wantedItem.Name);
+        Console.WriteLine($"- {wantedItem.Name}");
     }
 
     Console.WriteLine($"You offered: ");
     if (offeredItems.Count == 0)
     {
-        Console.WriteLine("nothing");
+        Console.WriteLine("- nothing");
     }
     else
     {
@@ -547,7 +581,7 @@ static void CreateTrade(
         }
     }
 
-    Console.WriteLine("Press ENTER to continue");
+    Console.WriteLine("\nPress ENTER to continue");
     Console.ReadLine();
 }
 
@@ -558,14 +592,14 @@ static void SaveTradesToFile(List<Trade> trades, string tradesFilePath)
 
     foreach (Trade trade in trades)
     {
-        string itemLines = "";
+        string line = $"{trade.Sender.Name},{trade.Receiver.Name}";
+
         foreach (Item item in trade.Items)
         {
-            itemLines += item.Name + ",";
+            line += $",{item.Name},{item.Owner.Name}";
         }
-        string tradeLine = $"{trade.Sender.Name},{trade.Receiver.Name},{itemLines}{trade.Status}";
-
-        tradeLines.Add(tradeLine);
+        line += $",{trade.Status}";
+        tradeLines.Add(line);
     }
     File.WriteAllLines(tradesFilePath, tradeLines);
 }
