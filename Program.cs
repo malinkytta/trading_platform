@@ -398,7 +398,7 @@ static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, str
 {
     Console.Clear();
 
-    // Lista för andras items som inte har status 'pending'
+    // Lista för andras items som inte tillhör den inloggade
     List<Item> othersItems = new List<Item>();
 
     foreach (Item item in items)
@@ -408,6 +408,8 @@ static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, str
             othersItems.Add(item);
         }
     }
+
+    //Filtrera bort items som är med i pending-trades
     List<Item> availableItems = GetAvailableItems(othersItems, trades);
 
     if (availableItems.Count == 0)
@@ -418,31 +420,13 @@ static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, str
         return;
     }
 
-    List<Item> selected = new List<Item>();
-    User? selectedOwner = null;
-    string header = "----- Pick items to request -----";
-    while (true)
-    {
-        List<Item> remaining = GetRemainingItems(availableItems, selected);
-        if (remaining.Count == 0)
-        {
-            break;
-        }
-        Item? pick = SelectItemPrompt(remaining, selected, header);
+    // Välj flera “andras” items, lås till första valda ägarens items
+    List<Item> selected = PickItemsFromList(
+        availableItems,
+        "----- Pick items to request -----",
+        true
+    );
 
-        if (pick == null)
-        {
-            break;
-        }
-        if (selectedOwner == null)
-        {
-            selectedOwner = pick.Owner;
-            availableItems = FilterByOwner(availableItems, selectedOwner);
-
-            header = "----- Pick items to request (only " + selectedOwner.Name + ") -----";
-        }
-        selected.Add(pick);
-    }
     if (selected.Count > 0)
     {
         CreateTrade(trades, activeUser, selected, tradesFilePath, items);
@@ -466,7 +450,7 @@ static List<Item> GetRemainingItems(List<Item> availableItems, List<Item> select
     return remainingItems;
 }
 
-// Låter användaren välja ett item från en lsita, eller trycka ENTER för att avbryta
+// Låter användaren välja ett item från en lista, eller trycka ENTER för att avbryta
 // Returnerar det valda itemet, eller null om användaren avbryter
 static Item? SelectItemPrompt(List<Item> availableItems, List<Item> selectedItems, string menuTitle)
 {
@@ -607,30 +591,11 @@ static List<Item> PickOwnItems(List<Item> items, User activeUser, List<Trade> tr
     }
 
     // Lista över vad jag väljer
-    List<Item> selectedItems = new List<Item>();
-
-    while (true)
-    {
-        List<Item> remainingItems = GetRemainingItems(myItems, selectedItems);
-        if (remainingItems.Count == 0)
-        {
-            break;
-        }
-
-        // Visa meny för att välja ett item
-        Item? pick = SelectItemPrompt(
-            remainingItems,
-            selectedItems,
-            "----- Pick your items to offer -----"
-        );
-
-        if (pick == null)
-        {
-            break;
-        }
-
-        selectedItems.Add(pick);
-    }
+    List<Item> selectedItems = PickItemsFromList(
+        myItems,
+        "----- Pick your items to offer -----",
+        false
+    );
 
     return selectedItems;
 }
@@ -896,4 +861,53 @@ static List<Item> GetAvailableItems(List<Item> allItems, List<Trade> trades)
         }
     }
     return availableItems;
+}
+
+// Låter användaren välja flera items från en lista.
+// Om "sameOwnerOnly" är true så låser metoden valet till den ägare som tillhör det första itemet som väljs (används i ShowItems).
+// Om false, kan användaren välja fritt bland alla (används i PickOwnItems).
+static List<Item> PickItemsFromList(List<Item> sourceItems, string header, bool sameOwnerOnly)
+{
+    List<Item> selectedItems = new List<Item>();
+    User lockedOwner = null;
+    string currentTitle = header;
+
+    while (true)
+    {
+        // Bygg aktuell lista över valbara items (ev. filtrerad på låst ägare)
+        List<Item> availableItems = new List<Item>();
+
+        for (int i = 0; i < sourceItems.Count; i++)
+        {
+            Item currentItem = sourceItems[i];
+            if (lockedOwner == null || currentItem.Owner == lockedOwner)
+            {
+                availableItems.Add(currentItem);
+            }
+        }
+
+        //Ta bort de som redan är valda
+        List<Item> remainingItems = GetRemainingItems(availableItems, selectedItems);
+        if (remainingItems.Count == 0)
+        {
+            break;
+        }
+
+        // Välj ett item eller avbryt med ENTER
+        Item? chosenItem = SelectItemPrompt(remainingItems, selectedItems, currentTitle);
+
+        if (chosenItem == null)
+        {
+            break;
+        }
+
+        // Lås ägare efter första valet om så önskas
+        if (sameOwnerOnly && lockedOwner == null)
+        {
+            lockedOwner = chosenItem.Owner;
+            currentTitle = $"----- Pick items to request (only from: {lockedOwner.Name}) -----";
+        }
+        selectedItems.Add(chosenItem);
+    }
+    return selectedItems;
 }
