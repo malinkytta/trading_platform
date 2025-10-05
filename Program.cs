@@ -271,9 +271,8 @@ while (isRunning)
                     Console.Clear();
                     Console.WriteLine("----- Trades -----\n");
                     Console.WriteLine("1] Pending (incoming)");
-                    Console.WriteLine("2] Approved");
-                    Console.WriteLine("3] Completed (approved & denied)");
-                    Console.WriteLine("4] Back to Main Menu");
+                    Console.WriteLine("2] Completed trades");
+                    Console.WriteLine("3] Back to Main Menu");
 
                     string choice = Console.ReadLine();
 
@@ -284,14 +283,10 @@ while (isRunning)
                             break;
 
                         case "2":
-                            PrintApproved(trades, activeUser);
+                            PrintTradesByStatus(trades, activeUser);
                             break;
 
                         case "3":
-                            PrintCompleted(trades, activeUser);
-                            break;
-
-                        case "4":
                             currentMenu = Menu.Main;
                             break;
 
@@ -516,9 +511,14 @@ static Item? SelectItemPrompt(List<Item> availableItems, List<Item> selectedItem
         return null;
     }
 
+    // Försöker först omvandla användarens inmatning till en siffra (choice).
+    // Kontrollerar sedan att siffran är minst 1 och inte större än antalet items i listan.
+    // Listan som visas för användaren börjar på 1, men index i listan börjar på 0,
+    // därför används choice - 1 för att få rätt item.
+    // Om båda kontrollerna stämmer returneras det valda itemet.
     if (int.TryParse(input, out int choice) && choice >= 1 && choice <= availableItems.Count)
     {
-        return availableItems[choice - 1]; // returnerar det valda itemet
+        return availableItems[choice - 1];
     }
 
     Console.WriteLine("Invalid choice. Press ENTER to continue.");
@@ -561,7 +561,7 @@ static void CreateTrade(
     SaveTradesToFile(trades, tradesFilePath);
 
     Console.Clear();
-    Console.WriteLine($"Trade request sent to: {receiver.Name}");
+    Console.WriteLine($"Trade request sent to: {receiver.Name}\n");
     Console.WriteLine($"You want: ");
     foreach (Item wantedItem in wantedItems)
     {
@@ -688,12 +688,31 @@ static void HandlePending(
     Console.Clear();
     Console.WriteLine("----- Trade details -----\n");
     Console.WriteLine($"From:   {selected.Sender.Name}");
-    Console.WriteLine($"To:     {selected.Receiver.Name}");
+    Console.WriteLine($"To:     {selected.Receiver.Name}\n");
 
-    Console.WriteLine("Items:");
+    Console.WriteLine("You want:");
+
     foreach (Item item in selected.Items)
     {
-        Console.WriteLine($"   - {item.Name}");
+        if (item.Owner == selected.Receiver)
+        {
+            Console.WriteLine($"{item.Name}");
+        }
+    }
+    Console.WriteLine("You offered:");
+    bool anyOffered = false;
+    foreach (Item item in selected.Items)
+    {
+        if (item.Owner == selected.Sender)
+        {
+            Console.WriteLine($"{item.Name}");
+            anyOffered = true;
+        }
+    }
+
+    if (!anyOffered)
+    {
+        Console.WriteLine("- nothing");
     }
 
     Console.WriteLine("\n[A] Approve   [D] Deny   [ENTER] Back");
@@ -740,7 +759,7 @@ static void HandlePending(
 static List<Trade> PrintPending(List<Trade> trades, User activeUser)
 {
     Console.Clear();
-    Console.WriteLine("----- Pending trade requests -----\n");
+    Console.WriteLine("----- Pending trade requests -----");
 
     List<Trade> pendingList = new List<Trade>();
 
@@ -752,12 +771,31 @@ static List<Trade> PrintPending(List<Trade> trades, User activeUser)
         {
             pendingList.Add(trade);
 
-            Console.WriteLine($"{i}] From: {trade.Sender.Name} | Status: {trade.Status}");
+            Console.WriteLine($"\n{i}] From: {trade.Sender.Name}");
+            Console.WriteLine("   Wants:");
             foreach (Item item in trade.Items)
             {
-                Console.WriteLine($"    - {item.Name} (Owner: {item.Owner.Name})");
+                if (item.Owner == trade.Receiver)
+                {
+                    Console.WriteLine($"     - {item.Name}");
+                }
+            }
+
+            Console.WriteLine("   Offers:");
+            bool anyWanted = false;
+            foreach (Item item in trade.Items)
+            {
+                if (item.Owner == trade.Sender)
+                {
+                    Console.WriteLine($"     - {item.Name}");
+                    anyWanted = true;
+                }
             }
             i++;
+            if (!anyWanted)
+            {
+                Console.WriteLine("-     nothing");
+            }
         }
     }
     return pendingList;
@@ -787,80 +825,90 @@ static void SaveItemsToFile(List<Item> items, string itemsFilePath)
     File.WriteAllLines(itemsFilePath, itemLines);
 }
 
-// Skriver ut alla trades som är Approved för en användare.
-static void PrintApproved(List<Trade> trades, User activeUser)
+//Skriver ut alla trades för den inloggade användaren som är antingen Approved eller Denied. Sorteras så Approved visas först och sedan Denied.
+static void PrintTradesByStatus(List<Trade> trades, User activeUser)
 {
     Console.Clear();
-    Console.WriteLine("----- Completed (Approved) trades -----\n");
+    Console.WriteLine("--------------------------------------");
+    Console.WriteLine($"      Completed trades (for {activeUser.Name})");
+    Console.WriteLine("--------------------------------------\n");
 
     int i = 1;
-    bool found = false;
+    bool foundApproved = false;
+    bool foundDenied = false;
+
+    Console.WriteLine("-------- [A] Approved trades ---------\n");
+    foreach (Trade trade in trades)
+    {
+        if (trade.Sender == activeUser || trade.Receiver == activeUser)
+        {
+            if (trade.Status == TradeStatus.Approved)
+            {
+                foundApproved = true;
+
+                PrintTrade(trade, i);
+                i++;
+            }
+        }
+    }
+    if (!foundApproved)
+    {
+        Console.WriteLine($"- No approved trades\n");
+    }
+
+    // //Denied trades
+    Console.WriteLine("---------- [D] Denied trades ---------\n");
 
     foreach (Trade trade in trades)
     {
         if (
-            trade.Status == TradeStatus.Approved
-            && (trade.Sender == activeUser || trade.Receiver == activeUser)
+            (trade.Sender == activeUser || trade.Receiver == activeUser)
+            && trade.Status == TradeStatus.Denied
         )
         {
-            found = true;
-
-            Console.WriteLine($"{i}] From: {trade.Sender.Name} | Status: {trade.Status}");
-
-            foreach (Item it in trade.Items)
-            {
-                Console.WriteLine($"    - {it.Name} (Owner: {it.Owner.Name})");
-            }
-
+            foundDenied = true;
+            PrintTrade(trade, i);
             i++;
         }
     }
-
-    if (!found)
+    if (!foundDenied)
     {
-        Console.WriteLine("No approved trades.");
+        Console.WriteLine($"- No denied trades \n");
     }
-    Console.WriteLine("Press ENTER to continue");
+
+    Console.WriteLine("--------------------------------------\n");
+    Console.WriteLine("Press ENTER to return.");
     Console.ReadLine();
 }
 
-// Skriver ut alla trades som är klara (ej Pending eller None) för en användare.
-static void PrintCompleted(List<Trade> trades, User activeUser)
+static void PrintTrade(Trade trade, int index)
 {
-    Console.Clear();
-    Console.WriteLine("----- Completed (Approved or Denied) -----\n");
+    bool isApproved = trade.Status == TradeStatus.Approved;
 
-    int i = 1;
-    bool found = false;
+    User wantedOwnerNow = isApproved ? trade.Sender : trade.Receiver;
+    User offeredOwnerNow = isApproved ? trade.Receiver : trade.Sender;
 
-    foreach (Trade trade in trades)
+    List<string> wantedItems = new List<string>();
+    List<string> offeredItems = new List<string>();
+
+    foreach (Item item in trade.Items)
     {
-        // visa bara completed trades där den inloggade är sender eller receiver
-        if (
-            (trade.Sender == activeUser || trade.Receiver == activeUser)
-            && trade.Status != TradeStatus.Pending
-            && trade.Status != TradeStatus.None
-        )
+        if (item.Owner == wantedOwnerNow)
         {
-            found = true;
-            Console.WriteLine(
-                $"\n{i}] From: {trade.Sender.Name} to: {trade.Receiver.Name} | Status: {trade.Status}"
-            );
-            Console.WriteLine("Items:");
-            foreach (Item item in trade.Items)
-            {
-                Console.WriteLine($"    - {item.Name} (Owner: {item.Owner.Name})");
-            }
-            i++;
+            wantedItems.Add(item.Name);
+        }
+        else if (item.Owner == offeredOwnerNow)
+        {
+            offeredItems.Add(item.Name);
         }
     }
-    if (!found)
-    {
-        Console.WriteLine("No completed requests.");
-    }
+    string wantedText = wantedItems.Count > 0 ? $"{string.Join(" and ", wantedItems)}" : "nothing";
 
-    Console.WriteLine("\nPress ENTER to return");
-    Console.ReadLine();
+    string offeredText = offeredItems.Count > 0 ? string.Join(" and ", offeredItems) : "nothing";
+
+    Console.WriteLine(
+        $"{index}] {trade.Sender.Name} -> {trade.Receiver.Name}\n   Wanted: {trade.Receiver.Name}s {wantedText}\n   Offered: {offeredText}\n   Status: {trade.Status}\n"
+    );
 }
 
 // Returnerar alla items som inte är med i någon pågående (Pending) trade
