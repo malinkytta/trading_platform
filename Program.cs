@@ -427,6 +427,7 @@ static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, str
     //Filtrera bort items som är med i pending-trades
     List<Item> availableItems = GetAvailableItems(othersItems, trades);
 
+    // Bubble sort för att sortera listan efter ägare
     for (int tries = 0; tries < availableItems.Count; tries++)
     {
         for (int i = 1; i < availableItems.Count; i++)
@@ -450,7 +451,7 @@ static void ShowItems(List<Item> items, User activeUser, List<Trade> trades, str
         return;
     }
 
-    // Välj flera “andras” items, lås till första valda ägarens items
+    // Välj flera “andras” items, lås till att bara visa den första valda ägarens items
     List<Item> selected = PickItemsFromList(
         availableItems,
         "----- Pick items to request -----",
@@ -541,23 +542,23 @@ static void CreateTrade(
 
     // Ägaren till det valda (den andras) item
     User receiver = wantedItems[0].Owner;
-    List<Item> payload = new List<Item>();
+    List<Item> tradedItems = new List<Item>();
 
-    // Kolla ägare + lägg till items i payload
+    // Kolla ägare + lägg till items i tradedItems
     foreach (Item wantedItem in wantedItems)
     {
-        payload.Add(wantedItem);
+        tradedItems.Add(wantedItem);
     }
 
     List<Item> offeredItems = PickOwnItems(items, sender, trades);
 
     foreach (Item offeredItem in offeredItems)
     {
-        payload.Add(offeredItem);
+        tradedItems.Add(offeredItem);
     }
 
     //Skapa och spara traden
-    Trade newTrade = new Trade(payload, sender, receiver, TradeStatus.Pending);
+    Trade newTrade = new Trade(tradedItems, sender, receiver, TradeStatus.Pending);
     trades.Add(newTrade);
     SaveTradesToFile(trades, tradesFilePath);
 
@@ -806,7 +807,7 @@ static void PrintTradesByStatus(List<Trade> trades, User activeUser)
 {
     Console.Clear();
     Console.WriteLine("--------------------------------------");
-    Console.WriteLine($"      Completed trades   ");
+    Console.WriteLine($"      Completed trades               ");
     Console.WriteLine("--------------------------------------\n");
 
     int i = 1;
@@ -816,7 +817,10 @@ static void PrintTradesByStatus(List<Trade> trades, User activeUser)
     Console.WriteLine("-------- [A] Approved trades ---------\n");
     foreach (Trade trade in trades)
     {
-        if (trade.Status == TradeStatus.Approved)
+        if (
+            (trade.Sender == activeUser || trade.Receiver == activeUser)
+            && trade.Status == TradeStatus.Approved
+        )
         {
             foundApproved = true;
 
@@ -854,6 +858,7 @@ static void PrintTradesByStatus(List<Trade> trades, User activeUser)
     Console.ReadLine();
 }
 
+// Skriver ut en trade med avsändare, mottagare och vilka items som man ville ha/erbjöds och status.
 static void PrintTrade(Trade trade, int index)
 {
     List<string> wantedItems = new List<string>();
@@ -861,6 +866,9 @@ static void PrintTrade(Trade trade, int index)
 
     Console.WriteLine($"{index}] {trade.Sender.Name} -> {trade.Receiver.Name}");
 
+    // Eftersom ägarskapet bytts, kollar vi nuvarande ägare.
+    // Det receiver äger nu var det sender erbjöd ("offered"),
+    // och det sender äger nu var det sender ville ha ("wanted").
     if (trade.Status == TradeStatus.Approved)
     {
         foreach (Item item in trade.Items)
@@ -875,7 +883,7 @@ static void PrintTrade(Trade trade, int index)
             }
         }
     }
-    else
+    else if (trade.Status == TradeStatus.Denied)
     {
         foreach (Item item in trade.Items)
         {
@@ -892,7 +900,7 @@ static void PrintTrade(Trade trade, int index)
     // (Vet inte om vi gått igenom detta i kursen, så i värsta fall får jag skriva om det till en hederlig if-sats istället)
     // Kollar villkoret före "?". Är det true → används/skrivs det som står efter "?";
     // är det false så används/skrivs det som står efter ":"
-    string wantedText = wantedItems.Count > 0 ? string.Join(" and ", wantedItems) : "nothing";
+    string wantedText = string.Join(" and ", wantedItems);
     string offeredText = offeredItems.Count > 0 ? string.Join(" and ", offeredItems) : "nothing";
 
     Console.WriteLine(
