@@ -109,11 +109,13 @@ if (File.Exists(tradesFilePath))
                     break;
                 }
             }
+
             if (owner == null)
             {
                 break;
             }
-            for (int j = 0; i < items.Count; j++)
+
+            for (int j = 0; j < items.Count; j++)
             {
                 if (items[j].Name == itemName && items[j].Owner == owner)
                 {
@@ -123,8 +125,7 @@ if (File.Exists(tradesFilePath))
             }
         }
 
-        TradeStatus currentStatus = TradeStatus.None;
-
+        TradeStatus currentStatus;
         switch (statusText)
         {
             case "Pending":
@@ -561,8 +562,8 @@ static void CreateTrade(
     SaveTradesToFile(trades, tradesFilePath);
 
     Console.Clear();
-    Console.WriteLine($"Trade request sent to: {receiver.Name}\n");
-    Console.WriteLine($"You want: ");
+    Console.WriteLine($"Trade request sent to: {receiver.Name}");
+    Console.WriteLine("You want:");
     foreach (Item wantedItem in wantedItems)
     {
         Console.WriteLine($"- {wantedItem.Name}");
@@ -644,8 +645,6 @@ static void HandlePending(
     string itemsFilePath
 )
 {
-    Console.Clear();
-
     // skriv ut listan
     List<Trade> pendingList = PrintPending(trades, activeUser);
 
@@ -686,35 +685,10 @@ static void HandlePending(
     Trade selected = pendingList[inputChoice - 1];
 
     Console.Clear();
-    Console.WriteLine("----- Trade details -----\n");
-    Console.WriteLine($"From:   {selected.Sender.Name}");
-    Console.WriteLine($"To:     {selected.Receiver.Name}\n");
-
-    Console.WriteLine("You want:");
-
-    foreach (Item item in selected.Items)
-    {
-        if (item.Owner == selected.Receiver)
-        {
-            Console.WriteLine($"{item.Name}");
-        }
-    }
-    Console.WriteLine("You offered:");
-    bool anyOffered = false;
-    foreach (Item item in selected.Items)
-    {
-        if (item.Owner == selected.Sender)
-        {
-            Console.WriteLine($"{item.Name}");
-            anyOffered = true;
-        }
-    }
-
-    if (!anyOffered)
-    {
-        Console.WriteLine("- nothing");
-    }
-
+    Console.WriteLine("--------- Manage trade ---------");
+    Console.WriteLine(
+        $"\nManage request #{inputChoice} from {selected.Sender.Name} → {selected.Receiver.Name}"
+    );
     Console.WriteLine("\n[A] Approve   [D] Deny   [ENTER] Back");
 
     string action = Console.ReadLine();
@@ -731,6 +705,7 @@ static void HandlePending(
             else if (item.Owner == selected.Receiver)
                 item.Owner = selected.Sender;
         }
+
         selected.Status = TradeStatus.Approved;
 
         SaveTradesToFile(trades, tradesFilePath);
@@ -742,6 +717,7 @@ static void HandlePending(
     {
         Console.Clear();
         selected.Status = TradeStatus.Denied;
+
         SaveTradesToFile(trades, tradesFilePath);
         Console.WriteLine("Request denied.");
     }
@@ -759,7 +735,7 @@ static void HandlePending(
 static List<Trade> PrintPending(List<Trade> trades, User activeUser)
 {
     Console.Clear();
-    Console.WriteLine("----- Pending trade requests -----");
+    Console.WriteLine($"----- Pending trade requests (for {activeUser.Name}) -----");
 
     List<Trade> pendingList = new List<Trade>();
 
@@ -794,7 +770,7 @@ static List<Trade> PrintPending(List<Trade> trades, User activeUser)
             i++;
             if (!anyWanted)
             {
-                Console.WriteLine("-     nothing");
+                Console.WriteLine("    - nothing");
             }
         }
     }
@@ -825,12 +801,12 @@ static void SaveItemsToFile(List<Item> items, string itemsFilePath)
     File.WriteAllLines(itemsFilePath, itemLines);
 }
 
-//Skriver ut alla trades för den inloggade användaren som är antingen Approved eller Denied. Sorteras så Approved visas först och sedan Denied.
+// Skriver ut alla trades för den inloggade användaren som är antingen Approved eller Denied.
 static void PrintTradesByStatus(List<Trade> trades, User activeUser)
 {
     Console.Clear();
     Console.WriteLine("--------------------------------------");
-    Console.WriteLine($"      Completed trades (for {activeUser.Name})");
+    Console.WriteLine($"      Completed trades   ");
     Console.WriteLine("--------------------------------------\n");
 
     int i = 1;
@@ -840,15 +816,12 @@ static void PrintTradesByStatus(List<Trade> trades, User activeUser)
     Console.WriteLine("-------- [A] Approved trades ---------\n");
     foreach (Trade trade in trades)
     {
-        if (trade.Sender == activeUser || trade.Receiver == activeUser)
+        if (trade.Status == TradeStatus.Approved)
         {
-            if (trade.Status == TradeStatus.Approved)
-            {
-                foundApproved = true;
+            foundApproved = true;
 
-                PrintTrade(trade, i);
-                i++;
-            }
+            PrintTrade(trade, i);
+            i++;
         }
     }
     if (!foundApproved)
@@ -858,7 +831,7 @@ static void PrintTradesByStatus(List<Trade> trades, User activeUser)
 
     // //Denied trades
     Console.WriteLine("---------- [D] Denied trades ---------\n");
-
+    int index = 1;
     foreach (Trade trade in trades)
     {
         if (
@@ -867,8 +840,8 @@ static void PrintTradesByStatus(List<Trade> trades, User activeUser)
         )
         {
             foundDenied = true;
-            PrintTrade(trade, i);
-            i++;
+            PrintTrade(trade, index);
+            index++;
         }
     }
     if (!foundDenied)
@@ -883,31 +856,47 @@ static void PrintTradesByStatus(List<Trade> trades, User activeUser)
 
 static void PrintTrade(Trade trade, int index)
 {
-    bool isApproved = trade.Status == TradeStatus.Approved;
-
-    User wantedOwnerNow = isApproved ? trade.Sender : trade.Receiver;
-    User offeredOwnerNow = isApproved ? trade.Receiver : trade.Sender;
-
     List<string> wantedItems = new List<string>();
     List<string> offeredItems = new List<string>();
 
-    foreach (Item item in trade.Items)
+    Console.WriteLine($"{index}] {trade.Sender.Name} -> {trade.Receiver.Name}");
+
+    if (trade.Status == TradeStatus.Approved)
     {
-        if (item.Owner == wantedOwnerNow)
+        foreach (Item item in trade.Items)
         {
-            wantedItems.Add(item.Name);
-        }
-        else if (item.Owner == offeredOwnerNow)
-        {
-            offeredItems.Add(item.Name);
+            if (item.Owner == trade.Receiver)
+            {
+                offeredItems.Add(item.Name);
+            }
+            else
+            {
+                wantedItems.Add(item.Name);
+            }
         }
     }
-    string wantedText = wantedItems.Count > 0 ? $"{string.Join(" and ", wantedItems)}" : "nothing";
-
+    else
+    {
+        foreach (Item item in trade.Items)
+        {
+            if (item.Owner == trade.Receiver)
+            {
+                wantedItems.Add(item.Name);
+            }
+            else if (item.Owner == trade.Sender)
+            {
+                offeredItems.Add(item.Name);
+            }
+        }
+    }
+    // (Vet inte om vi gått igenom detta i kursen, så i värsta fall får jag skriva om det till en hederlig if-sats istället)
+    // Kollar villkoret före "?". Är det true → används/skrivs det som står efter "?";
+    // är det false så används/skrivs det som står efter ":"
+    string wantedText = wantedItems.Count > 0 ? string.Join(" and ", wantedItems) : "nothing";
     string offeredText = offeredItems.Count > 0 ? string.Join(" and ", offeredItems) : "nothing";
 
     Console.WriteLine(
-        $"{index}] {trade.Sender.Name} -> {trade.Receiver.Name}\n   Wanted: {trade.Receiver.Name}s {wantedText}\n   Offered: {offeredText}\n   Status: {trade.Status}\n"
+        $"   Wanted: {wantedText}\n   Offered: {offeredText}\n   Status: {trade.Status}\n"
     );
 }
 
@@ -950,6 +939,7 @@ static List<Item> GetAvailableItems(List<Item> allItems, List<Trade> trades)
 // Om false, kan användaren välja fritt bland alla (används i PickOwnItems).
 static List<Item> PickItemsFromList(List<Item> sourceItems, string header, bool sameOwnerOnly)
 {
+    Console.Clear();
     List<Item> selectedItems = new List<Item>();
     User lockedOwner = null;
     string currentTitle = header;
