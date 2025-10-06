@@ -64,12 +64,32 @@ if (File.Exists(tradesFilePath))
 
         if (fields.Length < 5)
         {
-            break;
+            continue;
         }
 
         string senderName = fields[0];
         string receiverName = fields[1];
         string statusText = fields[fields.Length - 1];
+
+        TradeStatus currentStatus;
+        switch (statusText)
+        {
+            case "Pending":
+                currentStatus = TradeStatus.Pending;
+                break;
+
+            case "Approved":
+                currentStatus = TradeStatus.Approved;
+                break;
+
+            case "Denied":
+                currentStatus = TradeStatus.Denied;
+                break;
+
+            default:
+                currentStatus = TradeStatus.None;
+                break;
+        }
 
         User sender = null;
         User receiver = null;
@@ -110,11 +130,6 @@ if (File.Exists(tradesFilePath))
                 }
             }
 
-            if (owner == null)
-            {
-                break;
-            }
-
             for (int j = 0; j < items.Count; j++)
             {
                 if (items[j].Name == itemName && items[j].Owner == owner)
@@ -122,30 +137,14 @@ if (File.Exists(tradesFilePath))
                     tradedItems.Add(items[j]);
                     break;
                 }
+                else if (currentStatus == TradeStatus.Approved && items[j].Name == itemName)
+                {
+                    tradedItems.Add(items[j]);
+                    break;
+                }
             }
         }
 
-        TradeStatus currentStatus;
-        switch (statusText)
-        {
-            case "Pending":
-                currentStatus = TradeStatus.Pending;
-                break;
-
-            case "Approved":
-
-                currentStatus = TradeStatus.Approved;
-                break;
-
-            case "Denied":
-
-                currentStatus = TradeStatus.Denied;
-                break;
-
-            default:
-                currentStatus = TradeStatus.None;
-                break;
-        }
         // lägg till trade om allt finns
         if (sender != null && receiver != null && tradedItems.Count > 0)
         {
@@ -699,6 +698,9 @@ static void HandlePending(
     if (action == "A")
     {
         Console.Clear();
+        selected.Status = TradeStatus.Approved;
+        SaveTradesToFile(trades, tradesFilePath);
+
         foreach (Item item in selected.Items)
         {
             if (item.Owner == selected.Sender)
@@ -707,9 +709,6 @@ static void HandlePending(
                 item.Owner = selected.Sender;
         }
 
-        selected.Status = TradeStatus.Approved;
-
-        SaveTradesToFile(trades, tradesFilePath);
         SaveItemsToFile(items, itemsFilePath);
 
         Console.WriteLine("Request approved. Ownership updated and files saved.");
